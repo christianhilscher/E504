@@ -1,7 +1,11 @@
+from bokeh.io.output import output_notebook
 import numpy as np 
 import pandas as pd 
 import os 
 from bokeh.plotting import figure, output_file, show
+from bokeh.io import output_notebook
+from bokeh.models import ColumnDataSource as CDS
+from bokeh.models import CDSView, IndexFilter
 
 wd_lc = "/Users/llccf/OneDrive/Dokumente/3. Semester/International Trade and Tax Policy/Problem Sets/PS2/"
 os.chdir(wd_lc)
@@ -45,7 +49,7 @@ table = var_oi.groupby('V2').mean().reset_index().drop('V133', axis = 1)
 table['countries'] = table.set_index('V2').index.map(c_dict.get)
 table = table.sort_values('protrade')
 print(table)
-
+#!!!there are some countries missing here somehow!!!
 
 #*##############################
 #! Q2 b) - Alvaredo et al. (2013) Figure 2 
@@ -53,4 +57,23 @@ print(table)
 
 income = pd.read_csv('data/Alvaredoetal_Fig2_countries.csv', sep = ';').reset_index()
 income.columns = income.iloc[0, :]
-income = income.drop(0)
+income = income.drop(0).reset_index(drop = True)
+income = income.drop('Percentile', axis = 1)
+income['Year'] = income['Year'].astype(int)
+#rename columns
+new_colnames = ['US', 'CA', 'AUS', 'UK']
+income = income.rename(columns = {i:j for i, j in zip(income.columns[2:], new_colnames)})
+#convert values into floats (there are NaN)
+for i in new_colnames:
+    income[i] = income[i].astype(float)
+#get only data until 2010 (used in Alvaredo et al)
+income_oi = income[income['Year'] <= 2010]
+
+#now plot 
+output_notebook()
+ys = new_colnames
+source = CDS(data = dict{x = list(income_oi['Year'], y1 = list(income_oi['US'], 
+                            y2 = list(income_oi['CA'])))})
+p = figure(plot_width = 800, plot_height = 500)
+p.vline_stack(ys, x = 'Year', source = source)
+show(p)
