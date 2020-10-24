@@ -4,30 +4,64 @@ from pathlib import Path
 
 
 dir = Path.cwd()
-data_path = Path.cwd() / 'data/'
+data_path = Path.cwd() / "data/"
+wid_path = data_path / "wid_data/"
 
+## Q1
+# Reading in data
+def make_df1():
+    itr = pd.read_stata(data_path / "WVS_TimeSeries_stata_v1_2.dta", iterator=True)
 
-itr = pd.read_stata(data_path / 'WVS_TimeSeries_stata_v1_2.dta', iterator=True)
+    df = itr.read(convert_categoricals=False)
+    labels = itr.variable_labels()
+    # Including relevant variables such as year, country
+    base_vars = [1, 2, 3, 16, 17, 18, 19]
+    df_base = df.iloc[:, base_vars].copy()
+    #Adding variable of interest
+    interest_vars = ["E062", "A124_02", "A124_06", "A124_16", "X025", "X025A2", "X025R"]
+    df_out = pd.concat([df_base, df[interest_vars]], axis=1)
 
-df = itr.read(convert_categoricals=False)
-labels = itr.variable_labels()
+    return df_out
 
+# Recoding variables for our use
+def recode(dataf):
+    dataf = dataf.copy()
 
-# Including relevant variables such as year, country
-base_vars = [1, 2, 3, 16, 17, 18, 19]
-df_base = df.iloc[:, base_vars].copy()
-#Adding variable of interest
-df_out = pd.concat([df_base, df["E062"]], axis=1)
+    # Coding trade dummy
+    dataf["trade_dummy"] = np.nan
+    dataf.loc[dataf["E062"]==1, "trade_dummy"]=1
+    dataf.loc[dataf["E062"]==2, "trade_dummy"]=0
+    dataf.loc[dataf["E062"]==-1, "trade_dummy"]=0
 
-# Coding trade dummy
-df_out["trade_dummy"] = np.nan
-df_out.loc[df_out["E062"]==1, "trade_dummy"]=1
-df_out.loc[df_out["E062"]==2, "trade_dummy"]=0
-df_out.loc[df_out["E062"]==-1, "trade_dummy"]=0
+    # Coding education
+    dataf["education"] = np.nan
+    dataf.loc[(dataf["X025"]==1)|(dataf["X025"]==2)|(dataf["X025"]==2),
+              "education"] = 0
+    dataf.loc[(dataf["X025"]==4)|(dataf["X025"]==5)|(dataf["X025"]==6),
+              "education"] = 1
+    dataf.loc[(dataf["X025"]==7)|(dataf["X025"]==8),
+              "education"] = 2
+
+    # Renaming neighbours
+    dataf.rename(columns={"A124_02": "race",
+                          "A124_06": "immigrants"},
+                 inplace=True)
+    return dataf
+
+df = make_df1()
+df1 = recode(df)
 
 # Analysis
-df_out.groupby("COUNTRY_ALPHA")["trade_dummy"].mean()
+df1[df1["S020"]!= 1998].groupby("COUNTRY_ALPHA")["trade_dummy"].mean()
 
 # Trying weights
-df_out["weighted_td"] = df_out["S017"] * df_out["trade_dummy"]
-df_out[df_out["S002"]==3].groupby("COUNTRY_ALPHA")["weighted_td"].mean()
+df1["weighted_td"] = df1["S017"] * df1["trade_dummy"]
+df1.groupby("COUNTRY_ALPHA")["weighted_td"].mean()
+
+
+
+
+## Q2
+# Reading in data
+df = pd.read_csv(wid_path / "WID_Data_22102020-165529.csv", sep=";", skiprows=1)
+df.dropna()
